@@ -3,6 +3,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Footer from './components/Footer';
 import Scanner from './components/Scanner';
+import BackgroundScanning from './components/BackgroundScanning';
 import { fetchScanStats } from './services/api';
 import './App.css';
 
@@ -46,10 +47,7 @@ function App() {
           
           {/* Other components would be conditionally rendered here based on activeTab */}
           {activeTab === 'deepscan' && (
-            <div className="content-area">
-              <h2 className="page-title">Deep Scan</h2>
-              <p>Deep Scan component would be implemented here.</p>
-            </div>
+            <BackgroundScanning />
           )}
         </div>
       </main>

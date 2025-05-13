@@ -4,7 +4,7 @@ function Footer() {
   return (
     <footer className="footer">
       <div className="footer-bottom">
-        <p>&copy; {new Date().getFullYear()} SecureGuard. All Rights Reserved.</p>
+        <p>&copy; {new Date().getFullYear()} DigitalKavach. All Rights Reserved.</p>
       </div>
     </footer>
   );

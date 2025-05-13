@@ -369,9 +369,9 @@ def scan_with_model(filepath):
                     debug_print(f"Error getting prediction probabilities: {e}")
             
             # Convert numeric prediction to human-readable string
-            print("[DEBUG] Prediction:", prediction_result)
+            print("[DEBUG] Prediction result:", prediction_result)
             prediction_str = "malicious" if prediction_result == 0.0 else "benign"
-            print("[DEBUG] Prediction:", prediction_str)  
+            print("[DEBUG] Prediction string:", prediction_str)  
             
             # Return prediction result
             result = {
@@ -383,8 +383,9 @@ def scan_with_model(filepath):
             
             if prediction_proba is not None:
                 result["probability"] = prediction_proba
-                
-            if prediction_result == 1:
+            
+            # FIXED: Make sure message matches the prediction_str
+            if prediction_str == "malicious":
                 result["message"] = "This file is potentially malicious."
             else:
                 result["message"] = "This file appears to be benign."
@@ -408,7 +409,6 @@ def scan_with_model(filepath):
             "message": str(e),
             "filepath": filepath
         }
-
 def scan_running_exes():
     """Scan all currently running executable files for malware
     

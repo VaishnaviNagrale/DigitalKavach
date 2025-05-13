@@ -8,6 +8,7 @@ import numpy as np
 import pickle
 import pandas as pd
 import traceback
+import uuid
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -227,6 +228,8 @@ def extract_exe_features(filepath):
 
 # Global variable for the model
 MODEL = None
+SCALER = None
+FEATURE_NAMES = None
 
 # Load the pre-trained model
 def load_pickle(file_name, possible_paths):
@@ -271,7 +274,6 @@ def load_model():
                 # ✅ Try loading scaler and feature_names from the same directory
                 SCALER = load_pickle("scaler.pkl", [model_dir])
                 FEATURE_NAMES = load_pickle("feature_names.pkl", [model_dir])
-
 
                 # ✅ Print model features if available
                 if hasattr(MODEL, 'feature_names_in_'):
@@ -327,8 +329,15 @@ def process_features(features):
         debug_print(f"Error processing features: {e}")
         debug_print(traceback.format_exc())
         return None
-# Modify the predict route in your Flask application
-# Find and replace the predict function in your backend file:
+
+# Generate a unique filename to prevent overwriting files with the same name
+def generate_unique_filename(original_filename):
+    # Get the file extension if any
+    if '.' in original_filename:
+        name_part, ext_part = original_filename.rsplit('.', 1)
+        return f"{name_part}_{str(uuid.uuid4())[:8]}.{ext_part}"
+    else:
+        return f"{original_filename}_{str(uuid.uuid4())[:8]}"
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -355,13 +364,14 @@ def predict():
         return jsonify({"error": "No selected file"}), 400
     
     try:
-        # Create a safe filename - replace problematic characters and spaces
+        # Create a unique filename to prevent conflicts when uploading the same file
         original_filename = file.filename
-        safe_filename = ''.join(c if c.isalnum() or c in ['', '-', '.'] else '' for c in original_filename)
+        unique_filename = generate_unique_filename(original_filename)
+        safe_filename = ''.join(c if c.isalnum() or c in ['', '-', '.', '_'] else '' for c in unique_filename)
         file_path = os.path.join(UPLOAD_FOLDER, safe_filename)
         
         # Save the uploaded file
-        debug_print(f"Saving file to: {file_path}")
+        debug_print(f"Saving file to: {file_path} (original: {original_filename})")
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             file.save(file_path)
@@ -416,7 +426,9 @@ def predict():
             # Return prediction result
             result = {
                 "prediction": prediction_str,  # CHANGED: Now returns "malicious" or "benign"
-                "raw_prediction": prediction_result  # Also include the raw value for reference
+                "raw_prediction": prediction_result,  # Also include the raw value for reference
+                "original_filename": original_filename,  # Include original filename in response
+                "stored_as": safe_filename  # Include unique filename in response
             }
             
             if prediction_proba is not None:
@@ -438,6 +450,29 @@ def predict():
     except Exception as e:
         debug_print(f"Unhandled error in prediction endpoint: {e}")
         debug_print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/cleanup', methods=['POST'])
+def cleanup_uploads():
+    """Endpoint to delete old files from the upload directory"""
+    try:
+        files_removed = 0
+        if os.path.exists(UPLOAD_FOLDER):
+            for filename in os.listdir(UPLOAD_FOLDER):
+                file_path = os.path.join(UPLOAD_FOLDER, filename)
+                if os.path.isfile(file_path):
+                    try:
+                        os.remove(file_path)
+                        files_removed += 1
+                    except Exception as e:
+                        debug_print(f"Error removing {file_path}: {e}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Removed {files_removed} files from upload directory"
+        }), 200
+    except Exception as e:
+        debug_print(f"Error in cleanup: {e}")
         return jsonify({"error": str(e)}), 500
     
 @app.route('/status', methods=['GET'])

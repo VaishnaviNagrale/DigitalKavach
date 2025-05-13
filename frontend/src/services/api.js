@@ -41,3 +41,40 @@ export const scanFile = async (file) => {
     throw error;
   }
 };
+// services/api.js
+
+export const backgroundScanning = async () => {
+  try {
+    const response = await fetch('http://localhost:8000/api/process_status');
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    // Don't consume the response here with print() or call response.json() twice
+    const data = await response.json();
+    console.log('Response data:', data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching background scan status:', error);
+    throw error;
+  }
+};
+
+// Function to retrieve saved scan results from the backend
+export const getSavedScanResults = async () => {
+  try {
+    const response = await fetch('http://localhost:8000/api/saved_results');
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('Saved scan results:', data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching saved scan results:', error);
+    throw error;
+  }
+};

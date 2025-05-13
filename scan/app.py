@@ -14,6 +14,7 @@ CORS(app)  # Enable CORS for all routes
 # Configuration
 DEBUG = True
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+SCAN_RESULTS_FILE = 'scan_results.json'
 SCAN_INTERVAL = 60 * 5  # Scan running processes every 5 minutes
 
 # Make sure the upload directory exists
@@ -75,9 +76,9 @@ def background_scan_loop():
                 
                 # Save results to disk
                 try:
-                    with open('scan_results.json', 'w') as f:
+                    with open(SCAN_RESULTS_FILE, 'w') as f:
                         json.dump(process_status, f)
-                    debug_print("Saved scan results to disk")
+                    debug_print(f"Saved scan results to disk: {SCAN_RESULTS_FILE}")
                 except Exception as e:
                     debug_print(f"Failed to save scan results: {e}")
             
@@ -115,6 +116,61 @@ def scan_running_processes():
     
     process_status = new_status
     debug_print(f"Scan complete. Scanned {len(process_status)} executables.")
+
+# New API endpoint to retrieve saved scan results
+@app.route('/api/saved_results', methods=['GET'])
+def get_saved_results():
+    """API endpoint to retrieve the saved scan results from file"""
+    try:
+        if os.path.exists(SCAN_RESULTS_FILE):
+            with open(SCAN_RESULTS_FILE, 'r') as f:
+                raw_data = json.load(f)
+                
+            # Process the data to match the format expected by the frontend
+            organized_results = {
+                'malicious': [],
+                'benign': [],
+                'error': []
+            }
+            
+            for path, result in raw_data.items():
+                if 'prediction' in result and result['prediction'] == 'malicious':
+                    organized_results['malicious'].append({
+                        'filepath': path,
+                        'result': result
+                    })
+                elif 'prediction' in result and result['prediction'] == 'benign':
+                    organized_results['benign'].append({
+                        'filepath': path,
+                        'result': result
+                    })
+                else:
+                    organized_results['error'].append({
+                        'filepath': path,
+                        'result': result
+                    })
+            
+            return jsonify({
+                'last_scan_time': os.path.getmtime(SCAN_RESULTS_FILE),
+                'results': organized_results,
+                'summary': {
+                    'total': len(raw_data),
+                    'malicious': len(organized_results['malicious']),
+                    'benign': len(organized_results['benign']),
+                    'error': len(organized_results['error'])
+                }
+            })
+        else:
+            return jsonify({
+                'message': 'No saved scan results found',
+                'results': {'malicious': [], 'benign': [], 'error': []},
+                'summary': {'total': 0, 'malicious': 0, 'benign': 0, 'error': 0}
+            })
+    
+    except Exception as e:
+        debug_print(f"Error retrieving saved scan results: {e}")
+        debug_print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/process_status', methods=['GET'])
 def get_process_status():
@@ -216,6 +272,14 @@ def scan_running_endpoint():
         benign_count = sum(1 for result in results.values() if result.get('prediction') == 'benign')
         error_count = sum(1 for result in results.values() if result.get('status') == 'error')
         
+        # Save the results to file
+        try:
+            with open(SCAN_RESULTS_FILE, 'w') as f:
+                json.dump(results, f)
+            debug_print(f"Saved scan results to disk: {SCAN_RESULTS_FILE}")
+        except Exception as e:
+            debug_print(f"Failed to save scan results: {e}")
+        
         return jsonify({
             "timestamp": time.time(),
             "results": results,
@@ -234,4 +298,4 @@ def scan_running_endpoint():
 
 if __name__ == '__main__':
     initialize()
-    app.run(debug=True)
+    app.run(debug=True, port=8000)
